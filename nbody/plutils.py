@@ -34,7 +34,7 @@ def sim_data(folderpath):
 def unwrap_kwargs(f):
     """
     Upack packed keyword arguments and send them in as positional keyword args
-    to enable users to send in their own additional kwargs to matplotlib funcs
+    to enable users to send in their own additionaseel kwargs to matplotlib funcs
     without them raising an error "unrecognized argument" but still letting you
     set the default values over several functions to avoid having long lines
     everywhere in the notebook.
@@ -104,8 +104,11 @@ def hist_velocities(ax, v, bins, xlim, ylim, label, fname, title, show, s,
         raise ValueError("Please provide the name of the file image will be saved to.")
 
     out = ax.hist(v, label=label, bins=bins, **kwargs)
-    if ylabel is not None: ax.set_ylabel(ylabel)
-    if title is not None: ax.set_title(title)
+
+    if xlabel is None: ax.set_xlabel(r"$v [1/v_s]$")
+    else: ax.set_ylabel(xlabel)
+    if ylabel is None: ax.set_ylabel("N [counts]")
+    else: ax.set_ylabel(ylabel)
 
     ax.legend()
     ax.set_xlim(xlim)
@@ -159,6 +162,9 @@ def plot_avg_v(ax, data, bins=100, which=-1, extent=(-2, 2), **kwargs):
     w=binedg[1]-binedg[0]
     ax.bar(binedg[:-1], vhc, label="Sim.", width=w, alpha=0.3)
 
+    ax.set_ylabel("N [counts]")
+    ax.set_xlabel(r"$v [1/v_s]$")
+
     ax.legend()
     return ax
 
@@ -193,7 +199,7 @@ def plot_Etot(ax, data, doprint=True, **kwargs):
     ax.set_ylabel("2*Ekin [kT]")
     ax.legend()
     if doprint:
-        print("Average total energy of the system is {0}eV.".format(np.mean(ekin)/2.))
-        print("Maximal total energy of the system is {0}eV.".format(np.max(ekin)/2.))
-        print("Minimal total energy of the system is {0}eV.".format(np.min(ekin)/2.))
+        print("Average total energy of the system is {0}kT.".format(np.mean(ekin)/2.))
+        print("Maximal total energy of the system is {0}kT.".format(np.max(ekin)/2.))
+        print("Minimal total energy of the system is {0}kT.".format(np.min(ekin)/2.))
     return ax
