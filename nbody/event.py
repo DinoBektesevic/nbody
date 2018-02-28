@@ -101,13 +101,13 @@ class Event:
         elif self.obj1type == "Wall":
             avalid = True
 
-        if (self.obj2type == "Particle" and 
+        if (self.obj2type == "Particle" and
             self.obj2.ncollisions == self.initncolobj2):
             bvalid = True
         elif self.obj2type == "Wall":
             bvalid = True
 
-        
+
         return avalid and bvalid
 
     def execute(self):

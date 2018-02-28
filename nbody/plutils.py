@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 from os.path import join
-from scipy.stats import maxwell
 
 __all__ = ["plot_Etot",
            "plot_positions", "plot_all_positions",
