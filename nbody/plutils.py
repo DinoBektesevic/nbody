@@ -6,8 +6,8 @@ from scipy.stats import maxwell
 
 __all__ = ["plot_Etot",
            "plot_positions", "plot_all_positions",
-           "hist_velocities", "hist_all_velocities",
-           "snapshot_data", "sim_data", "plot_avg_v"]
+           "hist_velocities", "hist_all_velocities",  "plot_avg_v",
+           "snapshot_data", "sim_data"]
 
 
 ############################################################
@@ -28,16 +28,15 @@ def sim_data(folderpath):
 
 
 
+
 ############################################################
 ##################        Plotting functions        ########
 ############################################################
 def unwrap_kwargs(f):
     """
-    Upack packed keyword arguments and send them in as positional keyword args
-    to enable users to send in their own additionaseel kwargs to matplotlib funcs
-    without them raising an error "unrecognized argument" but still letting you
-    set the default values over several functions to avoid having long lines
-    everywhere in the notebook.
+    Unpack keyword arguments and send them in as positional keyword args to the
+    decorated function to create a uniform interface to the matplotlib
+    functionality.
     """
     def callf(*args, **kwargs):
         show  = True     if kwargs.get("show")   is None else kwargs.pop("show")
@@ -55,8 +54,12 @@ def unwrap_kwargs(f):
     return callf
 
 
+
 @unwrap_kwargs
 def plot_positions(ax, x, y, s, label, show, title, fname, xlabel, ylabel, **kwargs):
+    """
+    Scatter plots x and y coordinates on axis ax. 
+    """
     if fname is None and not show:
         raise ValueError("Please provide the name of the file image will be saved to.")
 
@@ -82,8 +85,10 @@ def plot_positions(ax, x, y, s, label, show, title, fname, xlabel, ylabel, **kwa
         plt.clf()
         plt.close("all")
 
-
 def plot_all_positions(folderpath=".", **kwargs):
+    """
+    Calls plot_positions for every snapshot found in a given folder.
+    """
     ls = os.listdir(folderpath)
     ls.sort()
     for filename in ls:
@@ -91,15 +96,17 @@ def plot_all_positions(folderpath=".", **kwargs):
             fig, ax = plt.subplots(figsize=figsize)
             d = nbody.snapshot_data(filename)
             plot_positions(ax, d["x"], d["y"], **kwargs)
-            #plot_positions(filename, show)
 
-#ylabel= r"$N_{\mathrm{particles}}$" if kwargs.get("ylabel") is None else kwargs.pop("ylabel")
 
 
 
 @unwrap_kwargs
 def hist_velocities(ax, v, bins, xlim, ylim, label, fname, title, show, s,
                     xlabel, ylabel, **kwargs):
+    """
+    Given an axis ax and velocities v plots a historam of v.
+    """
+
     if fname is None and not show:
         raise ValueError("Please provide the name of the file image will be saved to.")
 
@@ -126,6 +133,9 @@ def hist_velocities(ax, v, bins, xlim, ylim, label, fname, title, show, s,
         plt.close("all")
 
 def hist_all_velocities(folderpath=".", **kwargs):
+    """
+    Calls hist_velocities for every snapshot found in a given folder.
+    """
     if fname is None and not show:
         raise ValueError("Please provide the name of the file image will be saved to.")
 
@@ -138,12 +148,11 @@ def hist_all_velocities(folderpath=".", **kwargs):
             hist_velocities(axes[0], d["vx"], **kwargs)
             hist_velocities(axes[0], d["vy"], **kwargs)
 
-
-
-############################################################
-##################        Plotting functions        ########
-############################################################
 def plot_avg_v(ax, data, bins=100, which=-1, extent=(-2, 2), **kwargs):
+    """
+    Given a list of snapshots 'data', plots a normalized histogram of the average
+    magnitude of the particle velocity v = sqrt(vx**2 + vy**2).
+    """
 
     vxavgc = np.zeros((bins, ))
     vyavgc = np.zeros((bins, ))
@@ -158,7 +167,8 @@ def plot_avg_v(ax, data, bins=100, which=-1, extent=(-2, 2), **kwargs):
         vys.extend(vy)
         vs.extend(v)
 
-    vhc,  binedg = np.histogram(vs, bins=bins, range=(0, extent[-1]), density=True)
+    vhc,  binedg = np.histogram(vs, bins=bins, range=(extent[0], extent[-1]),
+                                density=True)
     w=binedg[1]-binedg[0]
     ax.bar(binedg[:-1], vhc, label="Sim.", width=w, alpha=0.3)
 
@@ -170,26 +180,12 @@ def plot_avg_v(ax, data, bins=100, which=-1, extent=(-2, 2), **kwargs):
 
 
 
-def plot_v(ax, data, N, skip=1, scale=0.1, **kwargs):
-    vx, vy, v = averageN(data, N, skip)
-    vweights = np.ones_like(v)/len(v)
-
-    r = maxwell.rvs(scale=scale, size=10000)
-    rweights = np.ones_like(r)/len(r)
-
-    ax.hist(np.sqrt(v), weights=vweights, align="right", label="Sim.", **kwargs)
-    ax.hist(r, weights=rweights, align="left", label="Max.-Boltz. dist.", **kwargs)
-
-    ax.set_xlabel(r"$10^3[\frac{m}{s}]$")
-    ax.set_ylabel(r"$N_\mathrm{particles}$")
-    ax.legend()
-
-    return ax
-
-
-
 
 def plot_Etot(ax, data, doprint=True, **kwargs):
+    """
+    Calculates the total energy of a snapshot, assumed to be the sum of all
+    individual kinetic particle energies, and plots it as a function of time. 
+    """
     t = [d["t"][0] for d in data] 
     ekin = [sum( d["m"]*(d["vx"]**2+d["vy"]**2) ) for d in data]
 

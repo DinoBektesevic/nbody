@@ -4,13 +4,12 @@ class Event:
     """
     Describes a TDM system event between two objects: particle-particle or
     particle-wall.
-    Event is capable of verifying its own validity by tracking
-    if any of the objects involved in the event were previously involved in an
-    event that would change their state. This is why incrementing
-    Particle.ncollisions is very important.
-    Event can execute by calling the methods of involved objects in
-    correct order.
-    Events are compared on the basis of the time at which they occur.
+    Event is capable of verifying its own validity by tracking if any of the
+    objects involved in the event were previously involved in an event that
+    would change their state. 
+    Event executes by calling the methods of involved objects.
+    Events are compared on the basis of the time at which they occur, therefore
+    an earlier Event will be less than a later Event.
     Usage:
         e = Event(Particle, Particle)
         e = Event(Particle, Wall)

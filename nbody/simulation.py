@@ -10,23 +10,46 @@ from .event import Event
 __all__ = ["random_positions", "ordered_positions", "random_velocities",
            "identical_velocities", "ekin_constrained_velocities", "TDMSystem"]
 
-def random_positions(Nparticles, Pr, edgespacing=None, **kwargs):
+
+################################################################################
+####################          Position generating           ####################
+####################               functions                ####################
+################################################################################
+def random_positions(Nparticles, Pr, edgespacing=None, pspacing=None, **kwargs):
     """
     Sets the intiial particle location to completely random
     non-overlapping positions.
+
+    Nparticles:  number (int) of particles to generate
+    Pr:          particle radii (assumed identical so chose the largest one)
+    edgespacing: additional padding away from the edge of the box. It helps to
+                 start your particles in groups that quickly exchange energies
+                 through collisions.
+    pspacing:    additional padding around a particle in which particles will
+                 not be placed
+    scale:       Scaling applied to the random number generator, i.e. scaling
+                 of 100 will scale rng to 2 significant digits.
+    verbose:     True or False, how much printing should occur
     """
     edgespace = Pr if edgespacing is None else edgespacing
+    partspace = 0  if pspacing    is None else pspacing
     scale   = 10000 if kwargs.get("scale") is None else kwargs.get("scale")
     verbose = False if kwargs.get("verbose") is None else kwargs.get("verbose")
     if verbose:
         updated = False
         print("    2.2) Finding non-overlapping particle positions.")
 
+        
+    #create a annonymous function for brevity
+    genran = lambda: \
+             np.random.randint(edgespace*scale, (1-edgespace)*scale)/scale
 
-    genran = lambda : np.random.randint(edgespace*scale,
-                                        (1-edgespace)*scale)/scale
+    # first particle can be safely generated
     x = np.array([genran()])
     y = np.array([genran()])
+
+    # others need to be generated iteratively by checking that no overlap has
+    # occured between particles.
     while len(x) < Nparticles:
         if verbose and updated:
             updated = False
@@ -41,7 +64,7 @@ def random_positions(Nparticles, Pr, edgespacing=None, **kwargs):
         dy = y-tmpy
         d  = np.sqrt(dx*dx + dy*dy)
 
-        dontoverlap = d > 2.0*Pr
+        dontoverlap = d > (2.0*Pr + partspace)
         if all(dontoverlap):
             x = np.append(x, tmpx)
             y = np.append(y, tmpy)
@@ -53,6 +76,17 @@ def ordered_positions(Nparticles, Pr, edgespacing=0.1, pspacing=0.1, **kwargs):
     """
     Sets the intiial particle location in an incremental order from left to
     right, top to bottom.
+
+    Nparticles:  number (int) of particles to generate
+    Pr:          particle radii (assumed identical so chose the largest one)
+    edgespacing: additional padding away from the edge of the box. It helps to
+                 start your particles in groups that quickly exchange energies
+                 through collisions.
+    pspacing:    additional padding around a particle in which particles will
+                 not be placed
+    scale:       Scaling applied to the random number generator, i.e. scaling
+                 of 100 will scale rng to 2 significant digits.
+    verbose:     True or False, how much printing should occur
     """
     verbose = False if kwargs.get("verbose") is None else kwargs.get("verbose")
     edgespace = edgespacing if kwargs.get("edgespace") is None else kwargs.get("edgespace")
@@ -87,10 +121,23 @@ def ordered_positions(Nparticles, Pr, edgespacing=0.1, pspacing=0.1, **kwargs):
         y.append(newy)
     return x, y
 
+
+
+
+
+
+################################################################################
+####################          Velocity generating           ####################
+####################               functions                ####################
+################################################################################
 def random_velocities(Nparticles, scaling=10000., **kwargs):
     """
     Returns 2 arrays of random velocities vx and vy respectively in the range
-    [-v, v].
+    [-v, v] with the number of significant digits being controlled by scaling.
+
+    Nparticles: number (int) of particles for which speeds need to be generated
+    v:          determines the range of allowed velocities as [-v, v]
+    scaling:    number of significant digits of generated random numbers
     """
     scale = scaling if kwargs.get("scale") is None else kwargs.get("scale")
     v = 1.0 if kwargs.get("v") is None else kwargs.get("v")
@@ -103,6 +150,9 @@ def identical_velocities(Nparticles, **kwargs):
     """
     Returns 2 arrays of identical velocitie components vx, vy respectively.
     Magnitude of the velocity components is v.
+
+    Nparticles: number (int) of particles for which speeds need to be generated
+    v:          the velocity magnitude of all particles
     """
     v = 1.0 if kwargs.get("v") is None else kwargs.get("v")
     vx = v*np.ones((Nparticles, ))
@@ -111,54 +161,93 @@ def identical_velocities(Nparticles, **kwargs):
 
 def ekin_constrained_velocities(Nparticles, Pm=1, Ekin=1, **kwargs):
     """
-    Returns 2 arrays of velocities in the vx, vy respectively. The
-    magnitudes of the velocity components are such that they satisfy
-    (0.5vx+0.5)**2 = v**2.
-    Directions of the velocities are random.
+    Returns arrays of velocities vx and vy. All velocities share the same
+    magnitude. The magnitude of the velocity is determined as:
+        |v| = 0.5*np.sqrt(2*E_kin/m)
+    The orientations of velocity components vx and vy are chosen randomly, and
+    are independent of each other, to be in either the positive or negative
+    direction.
+
+    Nparticles:  number (int) of particles to generate
+    Pm:          particle mass (assumed identical)
+    Ekin:        kinetic energy of a particle
     """
     ekin = Ekin if kwargs.get("pkin") is None else kwargs.get("pkin")
     m = Pm if kwargs.get("pm") is None else kwargs.get("pm")
     v = np.sqrt(2.0*ekin/m)
     vmag = v/2.0
+
     vx = vmag*np.random.choice([1., -1.], size=Nparticles)
     vy = vmag*np.random.choice([1., -1.], size=Nparticles)
+
     return vx, vy
 
 
 
+
+
+
+################################################################################
+####################              TDMSystem                 ####################
+####################            implementation              ####################
+################################################################################
 class TDMSystem:
     """
     Defines a TDM system with N_particles, particle masses and radii.
     TDMSystem can be simulated up to the total simulation time in an event driven
     manner. The TDM system is described by the positions and velocities of
     particles. A series of Events is initialized which represent future particle
-    collisions, provided the microstate of the system remains unchanged.
-    Events are stored in a heap. A heap is an array with an invariant
+    collisions. Events are stored in a priority queue called `eventq`.
+    A priority queue is a heap, i.e. an array, with the invariant
         a[k] <= a[2*k+1] and
         a[k] <= a[2*k+2].
     Sorting a heap preserves this invariant. Zeroth element of a heap is always
-    the smallest element of the heap.
+    the smallest element of the heap. Because two Events are compared on the
+    basis of the time at which they occur the zeroth element of the heap will
+    always be the earliest Event that will occur as long as the Event is valid.
+    Events remain valid as long as both involved objects did not change their
+    state since the creation of the Event.
 
-    Because two Events are compared on the basis of the time at which they occur
-    the zeroth element of the heap will always be the earliest Event that will
-    occur.
+    System's microstate is then evolved to the time of the first Event by moving
+    all particles by their respective current velocities. Event, i.e. collision,
+    is executed and involved particle states are changed. New events are generated
+    for involved Event objects inserted into the queue. Old events involving
+    these two objects are invalidated.
 
-    System's microstate is then evolved to the time of the first Event
-    displacing all particles by their respective current velocities. Event, i.e.
-    collision, is executed and involved particle states are changed.
-    New events are generated for involved Event objects, when applicable, and
-    inserted into the heap. Old events, created prior executing the Event, that
-    involve these two objects will now declare as not valid.
     Events that would occur past the total simulated time, or occur with a time
     step that is larger than heapt, are not inserted into the heap.
+
     Simulation is executed until there are no Events left to execute.
 
     init parameters
     ----------------
        N_particles: number of particles to simulate
        total_t:     time up to which the simulation will execute
-       p_mass:      mass of particles, same for all particles
-       p_r:         radii of particles, same for all particles
+       ---- optional ----
+       p_mass:      particle mass , assumed identical, default 1
+       p_r:         particle radii, assumed identical, default 0.01
+       p_v:         particle velocity, passed onto velocity generating functions
+                    if required, ignored otherwise, default 1
+       p_kin:       particle kinetic energy, passed onto velocity generating
+                    functions if required, ignored otherwise, default 1
+       pos_type:    'random' OR 'ordered' OR 'user_defined', type of position
+                    generating function that will be called, default 'random'
+       pos_func:    if pos_type is 'user_defined' this function will be used to
+                    create particle positions, ignored otherwise, default None
+       vel_type:    'random' OR 'identical' OR 'ekin_constrained' OR 'user_defined',
+                    type of velocity generating function, default 'random'
+       vel_func:    if vel_type is 'user_defined' this function will be used to
+                    create particle velocities, ignored otherwise, default None
+       save_t:      minimal time between two saved snapshots, default 0.01
+       heap_t:      maximal time up to which Events are created and stored in
+                    the queue, for sims. with large t_total creating and
+                    maintaining a queue up to t_total is memory-intensive and
+                    pointless as most of the Events in the future will be likely
+                    invalidated.
+       verbose:     default True, how loud should the code be.
+       **kwargs:    all kwargs are passed to position and velocity generating
+                    functions such that you can seamlessly use any of their
+                    arguments during class instantiation 
 
     attributes
     ----------------
@@ -225,7 +314,7 @@ class TDMSystem:
 
     def __initParticles(self, **kwargs):
         """
-        Initialize particles to random positions and velocities.
+        Initialize positions and velocities of particles in the simulation.
         """
         if self.verbose: print("2) Initializing particles.")
 
@@ -248,14 +337,15 @@ class TDMSystem:
         ##############################################################
         if self.verbose: print("    2.1) Initializing particle velocities.")
         if self.veltype == "identical":
-            vx, vy = identical_velocities(self.nparticles, verbose=self.verbose,
-                                          **kwargs)
+            vx, vy = identical_velocities(self.nparticles,
+                                          verbose=self.verbose, **kwargs)
         elif self.veltype == "ekin_constrained":
-            vx, vy = ekin_constrained_velocities(self.nparticles, pkin=self.pkin,
-                                                 pm=self.pm, verbose=self.verbose,
-                                                 **kwargs)
+            vx, vy = ekin_constrained_velocities(self.nparticles,
+                                                 pkin=self.pkin, pm=self.pm,
+                                                 verbose=self.verbose, **kwargs)
         elif self.veltype == "user_defined":
-            vx, vy = self.velfunc(self.nparticles, p_r=self.pr, p_v=self.pv,
+            vx, vy = self.velfunc(self.nparticles,
+                                  p_r=self.pr, p_v=self.pv,
                                   p_mass=self.pm, p_kin=self.pkin,
                                   verbose=self.verbose, **kwargs)
         else:
@@ -271,7 +361,8 @@ class TDMSystem:
             x, y = ordered_positions(self.nparticles, self.pr,
                                      verbose=self.verbose, **kwargs)
         elif self.postype == "user_defined":
-            x, y = self.posfunc(self.nparticles, self.pr, p_v=self.pv,
+            x, y = self.posfunc(self.nparticles,
+                                self.pr, p_v=self.pv,
                                 p_mass=self.pm, p_kin=self.pkin,
                                 verbose=self.verbose, **kwargs)
         else:
@@ -281,7 +372,7 @@ class TDMSystem:
 
 
         ##############################################################
-        #                       Particles
+        #    Generate Particle objects from positions and velocities
         ##############################################################
         if self.verbose: print("    2.3) Instatiating Particles.")
         self.particles = list(map(Particle, zip(x, y), zip(vx, vy),
@@ -293,7 +384,8 @@ class TDMSystem:
 
     def __initEventHeap(self):
         """
-        For consistency, creates an initial Event heap.
+        For consistency, creates an initial Event heap - one can be created
+        at run time as well. 
         """
         if self.verbose: print("3) Initializing Event Heap.")
         i = 0
@@ -339,12 +431,14 @@ class TDMSystem:
     def simulate(self, snapshot=True):
         """
         As long as the event heap is not empty, evolves the particle states to
-        the first event in the heap, executes the event/collision, removes the
-        event from the heap, updates the heap with new events, unvalidates old
-        events for particles involved in the collision and repeats.
+        the first Event in the queue, executes the event, removes the event from
+        the queue, updates the queue with new events, unvalidates old events
+        for particles involved in the collision and repeats.
         Handles data output as well.
 
-        snapshot_dt: minimal time span between two snapshots.
+        snapshot: default True, if False no snapshot files will be created.
+                  Simulation will still be executed which can be used to skip
+                  burn-in period.
         """
         snap_t = 0
         while len(self.eventq) > 0:
@@ -368,7 +462,9 @@ class TDMSystem:
 
     def snapshot(self, t):
         """
-        Create a snapshot of current microstate.
+        Create a snapshot of current microstate. A snapshot is a file where for
+        each particle the following parameters are saved:
+                       t x y vx vy m r ncollisions
         """
         with open("snapshot_{0:.10}".format(float(t)), "w") as out:
             out.write("#t x y vx vy m r ncollisions\n")

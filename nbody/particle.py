@@ -2,8 +2,9 @@ import numpy as np
 
 class Particle:
     """
-    Describes a hard-sphere-like particle with position, velocity, mass
-    and radius in 2D space. Usage:
+    Describes a hard-sphere-like particle with position, velocity, mass and
+    radius in 2D space.
+    Usage:
         a = Particle(position, velocity, radius, mass)
         b = Particle((x, y), (vx, vy), r, m)
         dt = a.dt2Hit(b)
@@ -23,7 +24,7 @@ class Particle:
     attributes
     ----------------
        ncollisions: number of collisions particle has experienced so far,
-                         **MUST** increment after every interaction
+                    **MUST** increment after every interaction
 
     methods
     ----------------
@@ -89,17 +90,8 @@ class Particle:
         sigma = self.r + that.r
 
         d2 = (dvdr*dvdr) - dv2*(dr2-sigma*sigma)
-#       if d2 < 0.0009:
-#            d2 = 0
         if(dvdr>=0) or (d2<0):
             return float('inf')
-
- #       with np.errstate(invalid="raise"):
- #           try:
- #               return -(dvdr + np.sqrt(d2)) / dv2
- #           except:
- #               return float("inf")
-
 
         return -(dvdr + np.sqrt(d2)) / dv2
 
